@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "mman.h": "c",
+        "string.h": "c",
+        "fcntl.h": "c",
+        "select.h": "c"
+    }
+}
