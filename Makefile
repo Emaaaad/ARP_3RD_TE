@@ -18,8 +18,12 @@ DRONE_DYNAMICS_OBJ = bin/droneDynamics
 WATCHDOG_OBJ = bin/watchdog
 MASTER_OBJ = bin/master
 
+# Directories
+BIN_DIR = bin
+LOG_DIR = log
+
 # Default target
-all: $(SERVER_OBJ) $(WINDOW_OBJ) $(KEYBOARD_MANAGER_OBJ) $(DRONE_DYNAMICS_OBJ) $(WATCHDOG_OBJ) $(MASTER_OBJ)
+all: create_directories $(SERVER_OBJ) $(WINDOW_OBJ) $(KEYBOARD_MANAGER_OBJ) $(DRONE_DYNAMICS_OBJ) $(WATCHDOG_OBJ) $(MASTER_OBJ)
 	./bin/master
 
 $(SERVER_OBJ): $(SERVER_SRC)
@@ -40,8 +44,16 @@ $(WATCHDOG_OBJ): $(WATCHDOG_SRC)
 $(MASTER_OBJ): $(MASTER_SRC)
 	$(CC) $(CFLAGS) -o $(MASTER_OBJ) $(MASTER_SRC) -pthread
 
-clean:
-	rm -rf bin/*
-	rm -rf log/*
+create_directories:
+	mkdir -p $(BIN_DIR)
+	mkdir -p $(LOG_DIR)
 
-.PHONY: all clean
+clean:
+	@echo "Cleaning up..."
+	@echo "Removing binaries in $(BIN_DIR)..."
+	rm -rf $(BIN_DIR)
+	@echo "Removing logs in $(LOG_DIR)..."
+	rm -rf $(LOG_DIR)
+	@echo "Cleanup complete."
+
+.PHONY: all clean create_directories
