@@ -3,7 +3,6 @@
 #define CONSTANTS_H
 #define _POSIX_C_SOURCE 200809L
 
-
 #define maxMsgLength 200
 
 #define SEM_PATH "/sem_path"
@@ -29,25 +28,45 @@
 
 #define BUFFER_SIZE 1024
 #define RADIUS 2.0
+#define portno 8000
 
-typedef struct {
-    int x;
-    int y;
+typedef struct
+{
+    int newsockfd;
+    int result;
+    char *buffer;
+
+} ThreadData;
+
+typedef struct
+{
+    double x;
+    double y;
     int number;
 } Point;
 
+struct ThreadArgs
+{
+    int sockfd;
+    double height;
+    double width;
+};
+
 // Define the struct to hold target information
-typedef struct {
+typedef struct
+{
     int numTargets;
     int numTargetsReached;
 } TargetInfo;
 
-
-void handleSignal(int signo, siginfo_t *siginfo, void *context) {
-    if (signo == SIGINT) {
+void handleSignal(int signo, siginfo_t *siginfo, void *context)
+{
+    if (signo == SIGINT)
+    {
         exit(1);
     }
-    if (signo == SIGUSR1) {
+    if (signo == SIGUSR1)
+    {
         pid_t watchdogPID = siginfo->si_pid;
         kill(watchdogPID, SIGUSR2);
     }
