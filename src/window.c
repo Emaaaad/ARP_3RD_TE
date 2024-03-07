@@ -17,18 +17,32 @@
 #include <math.h>
 #include "../include/constant.h"
 
+int totalScore = 0;
+
 // Function for creating a new window
 WINDOW *createBoard(int height, int width, int starty, int startx)
 {
     WINDOW *displayWindow;
     displayWindow = newwin(height, width, starty, startx);
 
-    for (int i = 0; i < height * 0.9; ++i){mvwaddch(displayWindow, i, 0, '|');}     // Left border
-    for (int i = 0; i < width * 0.9; ++i){mvwaddch(displayWindow, 0, i, '=');}     // Upper border
+    for (int i = 0; i < height * 0.9; ++i)
+    {
+        mvwaddch(displayWindow, i, 0, '|');
+    } // Left border
+    for (int i = 0; i < width * 0.9; ++i)
+    {
+        mvwaddch(displayWindow, 0, i, '=');
+    } // Upper border
     int rightBorderX = (int)(width * 0.9);
-    for (int i = 0; i < height * 0.9; ++i){mvwaddch(displayWindow, i, rightBorderX, '|');}    // Right border
+    for (int i = 0; i < height * 0.9; ++i)
+    {
+        mvwaddch(displayWindow, i, rightBorderX, '|');
+    } // Right border
     int bottomBorderY = (int)(height * 0.9);
-    for (int i = 0; i < width * 0.9; ++i){mvwaddch(displayWindow, bottomBorderY, i, '=');}    // Bottom border
+    for (int i = 0; i < width * 0.9; ++i)
+    {
+        mvwaddch(displayWindow, bottomBorderY, i, '=');
+    } // Bottom border
 
     wrefresh(displayWindow);
     return displayWindow;
@@ -54,10 +68,10 @@ WINDOW *scoreboard = NULL;
 // Signal handler function for SIGWINCH
 void handleResize(int sig)
 {
-    endwin(); 
-    refresh(); 
-    setupNcursesWindows(&display, &scoreboard);  
-    refresh(); 
+    endwin();
+    refresh();
+    setupNcursesWindows(&display, &scoreboard);
+    refresh();
 }
 
 void displayTargets(WINDOW *win, Point *targets, int numTargets, double scalex, double scaley)
@@ -65,6 +79,8 @@ void displayTargets(WINDOW *win, Point *targets, int numTargets, double scalex, 
     wattron(win, COLOR_PAIR(4));
     for (int i = 0; i < numTargets; ++i)
     {
+        // printf("number: %d, targetsx, targetsy = %lf, %lf ", i, targets[i].x, targets[i].y);
+
         // Adjust target position based on scaling factor to fit within the window
         int x = (int)(targets[i].x / scalex);
         int y = (int)(targets[i].y / scaley);
@@ -108,9 +124,7 @@ int main(int argc, char *argv[])
     initscr();
     int key, initial;
     initial = 0;
-    int totalScore;
-    int lastObstacleHit = 0; 
-
+    int lastObstacleHit = 0;
 
     // Setting up colors
     start_color();
@@ -133,8 +147,8 @@ int main(int argc, char *argv[])
     // Extracting pipe information from command line arguments
     int pipeWindowKeyboard[2], pipeWatchdogWindow[2], (pipeServerWindowTar[2]), (pipeServerWindowObs[2]), (pipeServerWindowTar1[2]);
     sscanf(argv[1], "%d %d|%d %d|%d %d|%d %d|%d %d", &pipeWindowKeyboard[0], &pipeWindowKeyboard[1], &pipeWatchdogWindow[0],
-     &pipeWatchdogWindow[1], &pipeServerWindowTar[0], &pipeServerWindowTar[1], &pipeServerWindowObs[0], &pipeServerWindowObs[1],
-     &pipeServerWindowTar1[0], &pipeServerWindowTar1[1]);
+           &pipeWatchdogWindow[1], &pipeServerWindowTar[0], &pipeServerWindowTar[1], &pipeServerWindowObs[0], &pipeServerWindowObs[1],
+           &pipeServerWindowTar1[0], &pipeServerWindowTar1[1]);
     close(pipeWindowKeyboard[0]);
     close(pipeWatchdogWindow[0]);
     close(pipeServerWindowObs[1]);
@@ -174,7 +188,7 @@ int main(int argc, char *argv[])
         perror("mmap");
         exit(EXIT_FAILURE);
     }
-     
+
     // Open the log files
     FILE *logFile;
     char logFilePath[100];
@@ -193,23 +207,41 @@ int main(int argc, char *argv[])
     int numObstacles = 0;
     int numTargetsReached = 0;
 
+    int rvalue;
+    bool freeFlagTarget = false;
+    bool freeFlagObs = false;
     while (1)
     {
         // Read targets from the pipe
-        read(pipeServerWindowTar[0], &numTargets, sizeof(int));
 
-        if (numTargets > 0)
+        rvalue = read(pipeServerWindowTar[0], &numTargets, sizeof(int));
+        // fprintf(stderr, "rvalue: %d", rvalue);
+        if (rvalue > 0 && numTargets > 0)
         {
+            if (freeFlagTarget)
+            {
+                free(targets);
+            }
+            freeFlagTarget = true;
+            // free(targets);
             targets = (Point *)malloc(numTargets * sizeof(Point));
-            read(pipeServerWindowTar[0], targets, numTargets * sizeof(Point));
+            for (int i = 0; i < numTargets; i++)
+            {
+                read(pipeServerWindowTar[0], &(targets[i]), sizeof(Point)); // Write each target to the pipe
+            }
+            // read(pipeServerWindowTar[0], targets, numTargets * sizeof(Point));
         }
 
         // Read the number of obstacles from shared memory
-        read(pipeServerWindowObs[0], &numObstacles, sizeof(int));
+        rvalue = read(pipeServerWindowObs[0], &numObstacles, sizeof(int));
 
-
-        if (numObstacles > 0)
+        if (rvalue > 0 && numObstacles > 0)
         {
+            if (freeFlagObs)
+            {
+                free(obstacles);
+            }
+            freeFlagObs = true;
             obstacles = (Point *)malloc(numObstacles * sizeof(Point));
             read(pipeServerWindowObs[0], obstacles, numObstacles * sizeof(Point));
         }
@@ -224,27 +256,29 @@ int main(int argc, char *argv[])
 
         scalex = (double)boardSize / ((double)COLS * (windowWidth - 0.1));
         scaley = (double)boardSize / ((double)LINES * (windowHeight - 0.1));
-
+        // fprintf(stderr, "scalex, scaley = %lf, %lf", scalex, scaley);
 
         // Displaying targets
         if (numTargets > 0)
         {
             displayTargets(win, targets, numTargets, scalex, scaley);
-            free(targets);
+            // free(targets);
         }
 
         // Displaying obstacles
         if (numObstacles > 0)
         {
             displayObstacles(win, obstacles, numObstacles, scalex, scaley);
-            free(obstacles);
-        } 
+            // free(obstacles);
+        }
         // Check if the drone reaches any of the targets
         bool droneReachedTarget = false;
         int targetReachedIndex = -1;
-        for (int i = 0; i < numTargets; ++i) {
+        for (int i = 0; i < numTargets; ++i)
+        {
             double distance = sqrt(pow(position[4] - targets[i].x, 2) + pow(position[5] - targets[i].y, 2));
-            if (distance < RADIUS) {
+            if (distance < RADIUS)
+            {
                 droneReachedTarget = true;
                 targetReachedIndex = i;
                 break;
@@ -253,55 +287,63 @@ int main(int argc, char *argv[])
 
         // Check if the drone reaches any of the obstacles
         bool droneReachedObstacle = false;
-        for (int i = 0; i < numObstacles; ++i) {
-        double distance = sqrt(pow(position[4] - obstacles[i].x, 2) + pow(position[5] - obstacles[i].y, 2));
-        if (distance < RADIUS) {
-        droneReachedObstacle = true;
-        break; 
-       }
+        for (int i = 0; i < numObstacles; ++i)
+        {
+            double distance = sqrt(pow(position[4] - obstacles[i].x, 2) + pow(position[5] - obstacles[i].y, 2));
+            if (distance < RADIUS)
+            {
+                droneReachedObstacle = true;
+                break;
+            }
         }
 
         int removedTargetCount = 0; // Initialize removed target count
 
-        if (droneReachedTarget) {
+        if (droneReachedTarget)
+        {
             // Increment removed target count
             removedTargetCount++;
 
             // Store the value of the removed target
             int removedTarget, removedTargetValue;
             removedTarget = targets[targetReachedIndex].number;
-            
-            if (1 <= removedTarget && removedTarget <= 10) {
+
+            if (1 <= removedTarget && removedTarget <= 10)
+            {
                 removedTargetValue = removedTarget;
-            } else {
+            }
+            else
+            {
                 removedTargetValue = 0; // Set a default value if condition is not met
             }
 
             // Update targets (remove the target reached by the drone)
-            for (int i = targetReachedIndex; i < numTargets - 1; ++i) {
+            for (int i = targetReachedIndex; i < numTargets - 1; ++i)
+            {
                 targets[i] = targets[i + 1];
             }
 
             // Increment the counter for the number of targets reached
             numTargetsReached++;
 
-
-            //printf("numTargets: %d, numTargetsReached: %d\n", numTargets, numTargetsReached);
+            // printf("numTargets: %d, numTargetsReached: %d\n", numTargets, numTargetsReached);
 
             // Check if there are only 4 targets remaining
-        if (numTargets - numTargetsReached == 4) {
-            // Create a struct to hold target information
-            TargetInfo targetInfo;
-            targetInfo.numTargets = numTargets;
-            targetInfo.numTargetsReached = numTargetsReached;
+            if (numTargets - numTargetsReached == 4)
+            {
+                // Create a struct to hold target information
+                TargetInfo targetInfo;
+                targetInfo.numTargets = numTargets;
+                targetInfo.numTargetsReached = numTargetsReached;
 
-            // Write the struct to the pipe
-            if (write(pipeServerWindowTar1[1], &targetInfo, sizeof(targetInfo)) < 0) {
-                perror("Error writing to pipeServerWindowTar");
+                // Write the struct to the pipe
+                if (write(pipeServerWindowTar1[1], &targetInfo, sizeof(targetInfo)) < 0)
+                {
+                    perror("Error writing to pipeServerWindowTar");
+                }
+                // Reset numTargetsReached
+                numTargetsReached = 0;
             }
-            // Reset numTargetsReached
-            numTargetsReached = 0;
-        }
 
             // Write the removed target value to shared memory
             sem_wait(semID);
@@ -309,33 +351,36 @@ int main(int argc, char *argv[])
             sem_post(semID);
         }
 
-
-         // Write to shared memory only if an obstacle was reached
-        if (droneReachedObstacle) {
+        // Write to shared memory only if an obstacle was reached
+        if (droneReachedObstacle)
+        {
             int obstacleHit = -1; // Indicates an obstacle was hit
             sem_wait(semID);
             memcpy(shmPointer, &obstacleHit, sizeof(obstacleHit));
             sem_post(semID);
         }
         // Read the removed target value from shared memory
-        int sharedValue; 
+        int sharedValue;
         sem_wait(semID);
         memcpy(&sharedValue, shmPointer, sizeof(sharedValue));
         sem_post(semID);
 
-      
-       // Check if there's a new obstacle hit
-        if (sharedValue == -1 && lastObstacleHit == 0) {
+        // Check if there's a new obstacle hit
+        if (sharedValue == -1 && lastObstacleHit == 0)
+        {
             // New obstacle hit detected
             totalScore -= 2;
             lastObstacleHit = 1; // Update the last obstacle hit state
-        } else if (sharedValue != -1) {
+        }
+        else if (sharedValue != -1)
+        {
             // If the current value is not an obstacle hit, reset the last obstacle hit state
             lastObstacleHit = 0;
         }
 
         // Handle valid target score updates
-        if (1 <= sharedValue && sharedValue <= 10) {
+        if (1 <= sharedValue && sharedValue <= 10)
+        {
             totalScore += sharedValue;
         }
         // Print the score in the scoreboard window
@@ -343,15 +388,14 @@ int main(int argc, char *argv[])
         mvwprintw(scoreboard, 1, 1, "Position of the drone: %.2f,%.2f", position[4], position[5]);
         wattroff(scoreboard, COLOR_PAIR(1));
 
-            // Display the score
-             wattron(scoreboard, COLOR_PAIR(1));
-             mvwprintw(scoreboard, 2, 1, "Score: %d", totalScore); // Display cumulative score
-             wattroff(scoreboard, COLOR_PAIR(1));
-        
-        
+        // Display the score
+        wattron(scoreboard, COLOR_PAIR(1));
+        mvwprintw(scoreboard, 2, 1, "Score: %d", totalScore); // Display cumulative score
+        wattroff(scoreboard, COLOR_PAIR(1));
+
         // Display targets on the window
-        displayTargets(win, targets, numTargets, scalex, scaley);
-        displayObstacles(win, obstacles, numObstacles, scalex, scaley);
+        // displayTargets(win, targets, numTargets, scalex, scaley);
+        // displayObstacles(win, obstacles, numObstacles, scalex, scaley);
 
         // Sending the first drone position to drone.c via shared memory
         if (initial == 0)
@@ -419,3 +463,4 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+s
